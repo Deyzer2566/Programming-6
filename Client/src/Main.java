@@ -7,8 +7,14 @@ import java.util.LinkedList;
 import java.util.NoSuchElementException;
 
 public class Main {
-    public static void main(String [] args) throws IOException {
-        RemoteDatabase db = new RemoteDatabase("127.0.0.1", 25565);
+    public static void main(String [] args) {
+        RemoteDatabase db = null;
+        try {
+            db = new RemoteDatabase("127.0.0.1", 25565);
+        } catch (IOException e){
+            System.out.println(e.getMessage());
+            return;
+        }
         ConsoleIO console = new ConsoleIO();
         CommandHandler ch = new CommandHandler(db, console);
         console.write(">");
@@ -19,8 +25,12 @@ public class Main {
                 throw new RuntimeException(e);
             }
             String command = null;
-            if(System.in.available()==0)
-                continue;
+            try {
+                if(System.in.available()==0)
+                    continue;
+            } catch (IOException e) {
+                break;
+            }
             try{
                 command = console.readLine();
             } catch (NoSuchElementException e){
