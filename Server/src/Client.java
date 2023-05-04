@@ -60,6 +60,7 @@ public class Client extends IOHandler {
 
     @Override
     public void writeObject(Object obj) {
+        org.slf4j.LoggerFactory.getLogger("name").info("Отправка \""+ obj.toString()+"\"");
         try {
             out.writeObject(obj);
             out.flush();

@@ -1,21 +1,18 @@
 import command.*;
-import data.*;
 import io.*;
 import storage.*;
 
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
-import java.util.Scanner;
+
 
 public class Main {
+    static org.slf4j.Logger log;
     static void execute(IOHandler client, CommandHandler ch){
         String command = null;
         if(!client.hasNext())
@@ -27,15 +24,13 @@ public class Main {
         }
         if (command == null)
             return;
-//                if (command.equals("exit")) {
-//                    continue;
-//                }
         if (command.equals("")) {
             return;
         }
         LinkedList<String> commandArgs = new LinkedList<>(Arrays.asList(command.split(" ")));
         command = commandArgs.get(0);
         commandArgs.remove(0);
+        log.info("Пришла команда "+command);
         try {
             ch.execute(command, commandArgs.size() == 0 ? null : commandArgs.toArray(new String[commandArgs.size()]));
         } catch (ThereIsNotCommand | InvalidCommandArgumentException e) {
@@ -59,8 +54,9 @@ public class Main {
             System.out.println(e.getMessage());
         }
         LinkedList<Client> clients = new LinkedList<>();
-        //Client client = null;
         console.write(">");
+        log = org.slf4j.LoggerFactory.getLogger("name");
+        log.info("Начало работы");
         while(true){
             if(System.in.available()>0)
             {
@@ -68,10 +64,10 @@ public class Main {
                 try {
                     command = console.readLine();
                 } catch (NoSuchElementException e) {
-                    return;
+                    break;
                 }
                 if (command == null)
-                    return;
+                    break;
                 if (command.equals("exit")) {
                     break;
                 }
@@ -94,6 +90,7 @@ public class Main {
                 while(errChannel == null)
                     errChannel = serverSocketChannel.accept();
                 clients.add(new Client(socketChannel.socket(),errChannel.socket()));
+                log.info("Новое подключение");
             }
             for(Client client: clients) {
                 if (client.isConnected()) {
@@ -101,6 +98,7 @@ public class Main {
                 } else {
                     client.disconnect();
                     clients.remove(client);
+                    log.info("Клиент отключился");
                 }
             }
             try {
