@@ -26,6 +26,11 @@ public class PrintFieldAscendingExpelledStudentsCommand implements Command{
     @Override
     public void execute(String[] args) throws InvalidCommandArgumentException {
         Collection<Long> expelledStudents = db.getExpelledStudentsCount();
+        if(expelledStudents == null)
+        {
+            writer.write("null");
+            return;
+        }
         expelledStudents = expelledStudents.stream().sorted().toList();
         writer.writeObject(expelledStudents);
     }

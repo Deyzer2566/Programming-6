@@ -24,10 +24,10 @@ public class RemoveHeadCommand implements Command{
         StudyGroup group=null;
         try{
             group = db.removeHead();
+            writer.writeObject(group);
         } catch(GroupDidNotFound e){
             writer.writeError(e.getMessage());
         }
-        writer.writeObject(group);
     }
 
     @Override

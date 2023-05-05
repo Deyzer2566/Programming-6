@@ -5,150 +5,185 @@ import storage.ThereIsGroupWithThisIdException;
 
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.IllegalBlockingModeException;
 import java.nio.channels.SocketChannel;
 import java.util.Collection;
 
 public class RemoteDatabase extends Database {
 
-//    SocketChannel socketChannel;
-//    SocketChannel socketChannelErr;
-
     private SocketChannel socketChannel;
     private SocketChannel socketChannelErr;
 
     private boolean isConnected = false;
+    private boolean wasNull = false;
 
-    private ObjectInputStream in;
-    private ObjectOutputStream out;
-    private ObjectInputStream err;
+//    private ObjectInputStream in;
+//    private ObjectOutputStream out;
+//    private ObjectInputStream err;
 
     public RemoteDatabase(String host, int port) throws IOException {
         this.socketChannel = SocketChannel.open();
         this.socketChannelErr = SocketChannel.open();
         socketChannel.connect(new InetSocketAddress(host, port));
         socketChannelErr.connect(new InetSocketAddress(host, port));
-//        socketChannel.configureBlocking(false);
-//        socketChannelErr.configureBlocking(false);
+        socketChannel.configureBlocking(false);
+        socketChannelErr.configureBlocking(false);
 
-        this.out = new ObjectOutputStream(socketChannel.socket().getOutputStream());
-        this.in = new ObjectInputStream(socketChannel.socket().getInputStream());
-        this.err = new ObjectInputStream(socketChannelErr.socket().getInputStream());
+//        this.out = new ObjectOutputStream(socketChannel.socket().getOutputStream());
+//        this.in = new ObjectInputStream(socketChannel.socket().getInputStream());
+//        this.err = new ObjectInputStream(socketChannelErr.socket().getInputStream());
 
         isConnected = true;
-        System.out.println("connected!");
-    }
 
-    public void send(Object obj){
-        //ByteArrayOutputStream buff = new ByteArrayOutputStream(10240);
-        //ObjectOutputStream out = null;
         try {
-            //out = new ObjectOutputStream(buff);
-            out.writeObject(obj);
-            //socketChannel.write(ByteBuffer.wrap(buff.toByteArray()));
-        } catch (IOException e) {
-
-        }
-    }
-
-    private boolean sendCommandWithObject(String command, Object arg) {
-        try {
-            //ByteArrayOutputStream buff = new ByteArrayOutputStream(10240);
-            //ObjectOutputStream out = new ObjectOutputStream(buff);
-            out.writeObject(command);
-            out.writeObject(arg);
-            //socketChannel.write(ByteBuffer.wrap(buff.toByteArray()));
-        } catch (IOException e) {
-            return false;
-        }
-        return true;
-    }
-
-    private boolean sendCommandWithArgs(String command, String[] args){
-        StringBuilder sendStr = new StringBuilder();
-        sendStr.append(command);
-        if(args != null)
-            for(String arg:args)
-                sendStr.append(" ").append(arg);
-        try {
-            //ByteArrayOutputStream buff = new ByteArrayOutputStream(10240);
-            //ObjectOutputStream out = new ObjectOutputStream(buff);
-            out.writeObject(sendStr.toString());
-            //socketChannel.write(ByteBuffer.wrap(buff.toByteArray()));
-        } catch (IOException e) {
-            return false;
-        }
-        return true;
-    }
-
-    /*public Object recieve() throws IOException, ClassNotFoundException {
-        try {
-            Thread.sleep(150);
+            Thread.sleep(100);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        ByteBuffer buff = ByteBuffer.allocate(1024);
+        //ByteBuffer b = ByteBuffer.allocate(1024);
+        //socketChannel.read(b);
+        //socketChannelErr.read(b);
+
+        System.out.println("connected!");
+    }
+
+    public void send(Object[] obj) throws IOException{
+        ByteArrayOutputStream buff = new ByteArrayOutputStream();
+        ObjectOutputStream out = new ObjectOutputStream(buff);
+        for (Object o:obj)
+            out.writeObject(o);
+        out.flush();
+        socketChannel.write(ByteBuffer.wrap(buff.toByteArray()));
+    }
+
+    public Object recieve() throws ClassNotFoundException {
+        ByteBuffer buff = ByteBuffer.allocate(10240);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        int bytesRead = socketChannel.read(buff);
-        System.out.println(Integer.valueOf(bytesRead).toString() + " " + isConnected());
+        int bytesRead = 0;
+        try {
+            bytesRead = socketChannel.read(buff);
+        } catch (IOException e) {
+            disconnect();
+            return null;
+        }
         int totalRead = 0;
-        while (bytesRead != 0 || totalRead == 0) {
+        int length = 0;
+        while (totalRead < length || length == 0){
             totalRead += bytesRead;
             buff.flip();
             while(buff.hasRemaining())
                 baos.write(buff.get());
-            //buff.alignmentOffset(len,1);
+            if(length == 0){
+                try {
+                    ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(baos.toByteArray()));
+                    length = ois.readInt();
+                    ois.close();
+                    totalRead -= 6;
+                } catch (IOException e) {
+                }
+            }
             buff.clear();
-            bytesRead = socketChannel.read(buff);
+            try {
+                bytesRead = socketChannel.read(buff);
+            } catch (IOException e) {
+                disconnect();
+                return null;
+            }
+            try {
+                Thread.sleep(15);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        if(bytesRead == -1)
+        {
+            disconnect();
+            return null;
         }
         byte[] objectBytes = baos.toByteArray();
         ByteArrayInputStream bais = new ByteArrayInputStream(objectBytes);
-        ObjectInputStream ois = new ObjectInputStream(bais);
-        return ois.readObject();
+        try {
+            ObjectInputStream ois = new ObjectInputStream(bais);
+            ois.readInt();
+            return ois.readObject();
+        } catch (IOException e) {
+            return null;
+        }
     }
 
-    public Object recieveErr() throws IOException, ClassNotFoundException {
-//        try {
-//            Thread.sleep(50);
-//        } catch (InterruptedException e) {
-//            throw new RuntimeException(e);
+    public Object recieveErr() throws ClassNotFoundException {
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        ByteBuffer buff = ByteBuffer.allocate(10240);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        int bytesRead = 0;
+        try {
+            bytesRead = socketChannelErr.read(buff);
+        } catch (IOException e) {
+            disconnect();
+            return null;
+        }
+        int totalRead = 0;
+        while (bytesRead > 0 || (totalRead != 0 && totalRead < 5)){
+            totalRead += bytesRead;
+            buff.flip();
+            while(buff.hasRemaining())
+                baos.write(buff.get());
+            buff.clear();
+            try {
+                bytesRead = socketChannelErr.read(buff);
+            } catch (IOException e) {
+                disconnect();
+                return null;
+            }
+            try {
+                Thread.sleep(15);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        if(totalRead == 0)
+            return null;
+        if(bytesRead == -1)
+        {
+            disconnect();
+        }
+        byte[] objectBytes = baos.toByteArray();
+        ByteArrayInputStream bais = new ByteArrayInputStream(objectBytes);
+        ObjectInputStream ois = null;
+        try {
+            ois = new ObjectInputStream(bais);
+            return ois.readObject();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+//    public Object recieve() throws ClassNotFoundException {
+//        try{
+//            return in.readObject();
+//        } catch (IOException e){
+//            isConnected = false;
+//            return null;
 //        }
-        ByteBuffer buffer = ByteBuffer.allocate(10240);
-        if(socketChannel.read(buffer)<0) return null;
-        ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(buffer.array()));
-        return ois.readObject();
-    }
-
-    public int recieveInt() throws IOException{
-        ByteBuffer buffer = ByteBuffer.allocate(10240);
-        if(socketChannel.read(buffer)<0)
-            throw new IOException("НЕТ ДАННЫХ!");
-        ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(buffer.array()));
-        return ois.readInt();
-    }
-     */
-
-    public Object recieve() throws ClassNotFoundException {
-        try{
-            return in.readObject();
-        } catch (IOException e){
-            isConnected = false;
-            return null;
-        }
-    }
-
-//    public int recieveInt() throws IOException {
-//        return in.readInt();
 //    }
-
-    public Object recieveErr() throws IOException, ClassNotFoundException {
-        try{
-            return err.readObject();
-        } catch (IOException e){
-            isConnected = false;
-            return null;
-        }
-    }
+//
+////    public int recieveInt() throws IOException {
+////        return in.readInt();
+////    }
+//
+//    public Object recieveErr() throws IOException, ClassNotFoundException {
+//        try{
+//            return err.readObject();
+//        } catch (IOException e){
+//            isConnected = false;
+//            return null;
+//        }
+//    }
 
     public boolean isConnected(){
         return isConnected;
@@ -166,7 +201,11 @@ public class RemoteDatabase extends Database {
 
     @Override
     public void add(StudyGroup newGroup) {
-        if(!sendCommandWithObject("add",newGroup)) return;
+        try {
+            send(new Object[]{"add",newGroup});
+        } catch (IOException e) {
+            disconnect();
+        }
     }
 
     @Override
@@ -199,23 +238,27 @@ public class RemoteDatabase extends Database {
 
     @Override
     public void remove(long id) throws GroupDidNotFound {
-        if(!sendCommandWithArgs("remove",new String[]{Long.valueOf(id).toString()}))
-            return;
         try {
-            Thread.sleep(50);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            send(new Object[]{"remove "+Long.valueOf(id).toString()});
+        } catch (IOException e) {
+            disconnect();
+            return;
         }
         try {
             String err = (String)recieveErr();
-            throw new GroupDidNotFound(err);
-        } catch (IOException | ClassNotFoundException | ClassCastException | IllegalBlockingModeException e) {
+            if(err != null)
+                throw new GroupDidNotFound(err);
+        } catch (ClassNotFoundException | ClassCastException | IllegalBlockingModeException e) {
         }
     }
 
     @Override
     public void clear() {
-        sendCommandWithArgs("clear",null);
+        try {
+            send(new Object[]{"clear"});
+        } catch (IOException e) {
+            disconnect();
+        }
     }
 
     @Override
@@ -233,16 +276,22 @@ public class RemoteDatabase extends Database {
 
     @Override
     public StudyGroup removeHead() throws GroupDidNotFound {
-        sendCommandWithArgs("remove_head", null);
+        try {
+            send(new Object []{"remove_head"});
+        } catch (IOException e) {
+            disconnect();
+            return null;
+        }
+        try {
+            String err = (String)recieveErr();
+            if(err != null)
+                throw new GroupDidNotFound(err);
+        } catch (ClassNotFoundException | ClassCastException e) {
+        }
         StudyGroup ans = null;
         try {
             ans = (StudyGroup)recieve();
         } catch (ClassNotFoundException | ClassCastException e) {
-        }
-        try {
-            String err = (String)recieveErr();
-            throw new GroupDidNotFound(err);
-        } catch (IOException | ClassNotFoundException | ClassCastException | IllegalBlockingModeException e) {
         }
         if(ans == null)
             throw new GroupDidNotFound("Группа не найдена!");
@@ -277,25 +326,37 @@ public class RemoteDatabase extends Database {
 
     @Override
     public void update(long id, StudyGroup group) throws GroupDidNotFound {
-        if(!sendCommandWithArgs("update",new String[]{Long.valueOf(id).toString()}))
+        try {
+            send(new Object[]{"update "+Long.valueOf(id).toString(),group});
+        } catch (IOException e) {
+            disconnect();
             return;
-        send(group);
+        }
         try {
             String err = (String)recieveErr();
-            throw new GroupDidNotFound(err);
-        } catch (IOException | ClassNotFoundException | ClassCastException | IllegalBlockingModeException e) {
+            if(err != null)
+                throw new GroupDidNotFound(err);
+        } catch (ClassNotFoundException | ClassCastException | IllegalBlockingModeException e) {
         }
     }
 
     @Override
     public void addIfMax(StudyGroup group) {
-        sendCommandWithObject("add_if_max",group);
+        try {
+            send(new Object[]{"add_if_max",group});
+        } catch (IOException e) {
+            disconnect();
+        }
     }
 
     @Override
     public String getInfo() {
-        if(!sendCommandWithArgs("info",null))
+        try {
+            send(new Object[]{"info"});
+        } catch (IOException e) {
+            disconnect();
             return null;
+        }
         String info = null;
         try {
             info = (String) recieve();
@@ -307,8 +368,12 @@ public class RemoteDatabase extends Database {
 
     @Override
     public StudyGroup getMaxByStudentsCountGroup() {
-        if(!sendCommandWithArgs("max_by_students_count",null))
+        try {
+            send(new Object[]{"max_by_students_count"});
+        } catch (IOException e) {
+            disconnect();
             return null;
+        }
         StudyGroup group = null;
         try {
             group = (StudyGroup) recieve();
@@ -320,8 +385,12 @@ public class RemoteDatabase extends Database {
 
     @Override
     public Collection<Long> getExpelledStudentsCount() {
-        if(!sendCommandWithArgs("print_field_ascending_expelled_students",null))
+        try {
+            send(new Object[]{"print_field_ascending_expelled_students"});
+        } catch (IOException e) {
+            disconnect();
             return null;
+        }
         Collection<Long> ESCounts = null;
         try {
             ESCounts = (Collection<Long>) recieve();
@@ -333,8 +402,12 @@ public class RemoteDatabase extends Database {
 
     @Override
     public Collection<String> getUniqueNamesGroupsAdmins() {
-        if(!sendCommandWithArgs("print_unique_group_admin",null))
+        try {
+            send(new Object[]{"print_unique_group_admin"});
+        } catch (IOException e) {
+            disconnect();
             return null;
+        }
         Collection<String> UGAdmins = null;
         try {
             UGAdmins = (Collection<String>)recieve();
@@ -346,8 +419,12 @@ public class RemoteDatabase extends Database {
 
     @Override
     public String showAllGroups() {
-        if(!sendCommandWithArgs("show",null))
+        try {
+            send(new Object[]{"show"});
+        } catch (IOException e) {
+            disconnect();
             return null;
+        }
         String info = null;
         try {
             info = (String) recieve();

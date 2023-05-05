@@ -28,6 +28,8 @@ public class PrintUniqueGroupAdminCommand implements Command{
     @Override
     public void execute(String[] args) throws InvalidCommandArgumentException {
         Collection<String> uniqueNames = db.getUniqueNamesGroupsAdmins();
+        if(uniqueNames == null)
+            uniqueNames = new LinkedList<String>();
         writer.writeObject(uniqueNames);
     }
 }

@@ -1,9 +1,8 @@
 package storage;
 import java.time.ZonedDateTime;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.NoSuchElementException;
-import java.util.PriorityQueue;
+import java.util.*;
+import java.util.stream.Collectors;
+
 import data.*;
 
 public class LocalDatabase extends Database {
@@ -18,7 +17,7 @@ public class LocalDatabase extends Database {
     @Override
     public void add(StudyGroup newGroup){
         long id = 0;
-        for(StudyGroup group: getAllGroups().stream().sorted((o1, o2) -> o1.getId()>o2.getId()?1:0).toList()
+        for(StudyGroup group: getAllGroups().stream().sorted((o1, o2) -> o1.getId()>o2.getId()?1:-1).toList()
         ){
             if(group.getId() == id){
                 id++;
@@ -42,11 +41,9 @@ public class LocalDatabase extends Database {
     }
     @Override
     public StudyGroup getGroup(long id) throws GroupDidNotFound{
-        for(StudyGroup group: collection){
-            if(group.getId() == id){
-                return group;
-            }
-        }
+        List group = getAllGroups().stream().filter(x->x.getId()==id).toList();
+        if(!group.isEmpty())
+            return (StudyGroup) group.get(0);
         throw new GroupDidNotFound("Группа с указанным id не найдена");
     }
 
@@ -93,13 +90,11 @@ public class LocalDatabase extends Database {
 
     @Override
     public StudyGroup getMax(){
-        StudyGroup max = null;
-        for(StudyGroup group: collection){
-            if(max == null || group.compareTo(max)>0){
-                    max = group;
-            }
+        try{
+            return getAllGroups().stream().max((o1,o2)->o1.compareTo(o2)).get();
+        } catch (NoSuchElementException e){
+            return null;
         }
-        return max;
     }
     @Override
     public int getSize(){
@@ -115,44 +110,38 @@ public class LocalDatabase extends Database {
 
     @Override
     public void addIfMax(StudyGroup group){
-        if(group.compareTo(getMax())>0)
+        StudyGroup max = getMax();
+        if(max == null || group.compareTo(getMax())>0)
             add(group);
     }
 
     @Override
     public StudyGroup getMaxByStudentsCountGroup() {
-        StudyGroup max = getAllGroups().stream()
-                .max((o1, o2) -> o1.getStudentsCount() > o2.getStudentsCount() ? 1 : 0).get();
-        return max;
+        try{
+            StudyGroup max = getAllGroups().stream()
+                    .max((o1, o2) -> o1.getStudentsCount() > o2.getStudentsCount() ? 1 : 0).get();
+            return max;
+        } catch (NoSuchElementException e){
+            return null;
+        }
     }
 
     @Override
     public Collection<Long> getExpelledStudentsCount() {
-        LinkedList<Long> expelledStudents = new LinkedList<>();
-        for(StudyGroup group: getAllGroups()){
-            expelledStudents.add(group.getExpelledStudents());
-        }
-        expelledStudents.sort((o1, o2) -> o1.compareTo(o2));
+        List<Long> expelledStudents = getAllGroups().stream().map(x->x.getExpelledStudents())
+                .sorted((x1,x2)-> x1.compareTo(x2)).toList();
         return expelledStudents;
     }
 
     @Override
     public Collection<String> getUniqueNamesGroupsAdmins() {
-        LinkedList<String> uniqueNames = new LinkedList<>();
-        for(StudyGroup group: getAllGroups()){
-            if(!uniqueNames.contains(group.getGroupAdmin().getName())){
-                uniqueNames.add(group.getGroupAdmin().getName());
-            }
-        }
+        List<String> uniqueNames = getAllGroups().stream().map(x->x.getGroupAdmin()).
+                filter(x -> x!=null).map(x->x.getName()).distinct().sorted().toList();
         return uniqueNames;
     }
 
     @Override
     public String showAllGroups() {
-        StringBuilder stringBuilder = new StringBuilder();
-        for(StudyGroup group: getAllGroups()) {
-            stringBuilder.append(group.toString()).append("\n");
-        }
-        return stringBuilder.toString();
+        return getAllGroups().stream().map(x->x.toString()).collect(Collectors.joining("\n"));
     }
 }

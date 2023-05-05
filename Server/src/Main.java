@@ -55,7 +55,7 @@ public class Main {
         }
         LinkedList<Client> clients = new LinkedList<>();
         console.write(">");
-        log = org.slf4j.LoggerFactory.getLogger("name");
+        log = org.slf4j.LoggerFactory.getLogger("main");
         log.info("Начало работы");
         while(true){
             if(System.in.available()>0)

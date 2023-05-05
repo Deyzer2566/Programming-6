@@ -42,9 +42,9 @@ public class Main {
                 break;
             }
             if(command.equals("")){
+                console.write(">");
                 continue;
             }
-            System.out.println(db.isConnected());
             LinkedList<String> commandArgs = new LinkedList<>(Arrays.asList(command.split(" ")));
             command = commandArgs.get(0);
             commandArgs.remove(0);

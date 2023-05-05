@@ -72,7 +72,7 @@ public class DatabaseCSVLoader {
                 if(!params[8].equals("null"))
                     semester = Semester.valueOf(params[8]);
                 Person admin = null;
-                if(!params[9].equals("null")) {
+                if(!(params[9].equals("null") && params.length==10)) {
                     String adminName = params[9];
                     int weight = Integer.parseInt(params[10]);
                     if(weight < 0) throw new ParseFileException("Не удалось прочитать файл!");
