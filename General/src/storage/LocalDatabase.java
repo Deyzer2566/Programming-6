@@ -14,6 +14,7 @@ public class LocalDatabase extends Database {
         creationTime = ZonedDateTime.now();
     }
 
+    @Override
     public void add(StudyGroup newGroup){
         long id = 0;
         for(StudyGroup group: this.getAllGroups().stream().sorted((o1, o2) -> o1.getId()>o2.getId()?1:-1).toList()
