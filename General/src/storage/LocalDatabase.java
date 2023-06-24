@@ -14,10 +14,9 @@ public class LocalDatabase extends Database {
         creationTime = ZonedDateTime.now();
     }
 
-    @Override
     public void add(StudyGroup newGroup){
         long id = 0;
-        for(StudyGroup group: getAllGroups().stream().sorted((o1, o2) -> o1.getId()>o2.getId()?1:-1).toList()
+        for(StudyGroup group: this.getAllGroups().stream().sorted((o1, o2) -> o1.getId()>o2.getId()?1:-1).toList()
         ){
             if(group.getId() == id){
                 id++;
@@ -27,10 +26,14 @@ public class LocalDatabase extends Database {
         StudyGroup group = new StudyGroup(newGroup.getId(),newGroup.getName(), newGroup.getCoordinates(),
                 ZonedDateTime.now(), newGroup.getStudentsCount(), newGroup.getExpelledStudents(),
                 newGroup.getShouldBeExpelled(), newGroup.getSemesterEnum(), newGroup.getGroupAdmin());
-        collection.add(newGroup);
+        this.collection.add(newGroup);
     }
 
-    @Override
+    /**
+     * Добавляет группу в базу, изменяя её id
+     * @param newGroup группа, которую нужно добавить в коллекцию
+     * @return true, если группа успешно добавлена в базу, false, если нет
+     */
     public void put(StudyGroup newGroup) throws ThereIsGroupWithThisIdException{
         for(StudyGroup group: getAllGroups()){
             if(group.getId() == newGroup.getId()){
@@ -39,8 +42,13 @@ public class LocalDatabase extends Database {
         }
         collection.add(newGroup);
     }
-    @Override
-    public StudyGroup getGroup(long id) throws GroupDidNotFound{
+
+    /**
+     * Возвращает группу по её id
+     * @param id ИД группы
+     * @return StudyGroup группа с указаным id, если группа с таким id есть в коллекции, null, если группа не найдена
+     */
+    private StudyGroup getGroup(long id) throws GroupDidNotFound{
         List group = getAllGroups().stream().filter(x->x.getId()==id).toList();
         if(!group.isEmpty())
             return (StudyGroup) group.get(0);
@@ -77,7 +85,7 @@ public class LocalDatabase extends Database {
      *
      * @return коллекция базы
      */
-    public Collection<StudyGroup> getAllGroups(){
+    protected Collection<StudyGroup> getAllGroups(){
         return this.collection;
     }
 
@@ -88,7 +96,10 @@ public class LocalDatabase extends Database {
                 "Количество групп: "+collection.size();
     }
 
-    @Override
+    /**
+     *
+     * @return максимальную группу (сортировка по названию)
+     */
     public StudyGroup getMax(){
         try{
             return getAllGroups().stream().max((o1,o2)->o1.compareTo(o2)).get();
@@ -96,16 +107,20 @@ public class LocalDatabase extends Database {
             return null;
         }
     }
-    @Override
+
+    /**
+     *
+     * @return размер базы
+     */
     public int getSize(){
         return collection.size();
     }
 
     @Override
     public void update(long id, StudyGroup group) throws GroupDidNotFound{
-        remove(id);
+        collection.remove(getGroup(id));
         group.changeId(id);
-        add(group);
+        collection.add(group);
     }
 
     @Override
@@ -128,9 +143,8 @@ public class LocalDatabase extends Database {
 
     @Override
     public Collection<Long> getExpelledStudentsCount() {
-        List<Long> expelledStudents = getAllGroups().stream().map(x->x.getExpelledStudents())
-                .sorted((x1,x2)-> x1.compareTo(x2)).toList();
-        return expelledStudents;
+        return getAllGroups().stream().map(StudyGroup::getExpelledStudents)
+                .sorted(Long::compareTo).toList();
     }
 
     @Override
@@ -141,7 +155,7 @@ public class LocalDatabase extends Database {
     }
 
     @Override
-    public String showAllGroups() {
-        return getAllGroups().stream().map(x->x.toString()).collect(Collectors.joining("\n"));
+    public Collection<StudyGroup> showAllGroups() {
+        return getAllGroups();
     }
 }
